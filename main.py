@@ -374,10 +374,8 @@ def generate_training_data():
 
         os.replace(name, "./img/sudoko/done/" +  sudokok)
 
-    
-
-def main(img_name="./img/sudoko.png"):
-    img_sudoko_color = cv2.imread(img_name)
+def extract_cells(img):
+    img_sudoko_color = img
     width_max, height_max = 1280, 720
 
     img_sudoko = cv2.cvtColor(img_sudoko_color, cv2.COLOR_BGR2GRAY)
@@ -447,6 +445,9 @@ def main(img_name="./img/sudoko.png"):
     return cells, sudoko_warped_grey
 
 if __name__ == '__main__':
-    # main(img_name="./img/sudoko2.png")
-    generate_training_data()
+    img_name="./img/sudoko.png"
+    img = cv2.imread(img_name)
+    cells, img_warped = extract_cells(img)
+    
+    # generate_training_data()
 
