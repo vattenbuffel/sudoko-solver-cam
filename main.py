@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from numpy.core.fromnumeric import trace
 from line_test import extend_lines, construct_line, intersection_lines
+from solver import solve
+from network import load_model
 
 def create_base_board():
     # Create a base sudoko board
@@ -237,7 +239,7 @@ def show_lines(text, lines, img):
     cv2.destroyWindow(text)
     test = 5
 
-def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/180, img=None, max_increase_factor=1.05):
+def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/180, img=None, max_increase_factor=1.0):
     horizontal_lines = {}
     vertical_lines = {}
 
@@ -374,7 +376,24 @@ def generate_training_data():
 
         os.replace(name, "./img/sudoko/done/" +  sudokok)
 
-def extract_cells(img):
+def build_board(cells, img, digit_recognizer):
+    board = np.zeros((9,9), dtype='int')
+    for cell in cells:
+        p = cells[cell]
+        p0 = np.array([p[0], p[1]], dtype='int')
+        p1 = np.array([p[2], p[3]], dtype='int')
+        img_digit = img[p0[1]:p1[1], p0[0]:p1[0]]
+        val = digit_recognizer.predict_on_image(img_digit)
+
+        # If it's blank, change val to 0
+        if val == 10:
+            val = 0
+        board[cell] = val
+    
+    return board
+
+
+def extract_numbers_and_cells(img):
     img_sudoko_color = img
     width_max, height_max = 1280, 720
 
@@ -445,9 +464,15 @@ def extract_cells(img):
     return cells, sudoko_warped_grey
 
 if __name__ == '__main__':
-    img_name="./img/sudoko.png"
+    img_name="./img/sudoko4.png"
     img = cv2.imread(img_name)
-    cells, img_warped = extract_cells(img)
+    cells, img_warped = extract_numbers_and_cells(img)
+
     
+    digit_recognizer = load_model()
+    board = build_board(cells, img_warped, digit_recognizer)
+    solve(board)
+
+
     # generate_training_data()
 
