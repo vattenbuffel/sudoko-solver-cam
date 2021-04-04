@@ -174,22 +174,29 @@ def eliminate_duplicated_line_after_warp(lines, epsilon_angle =  10*np.pi/180, d
 
     # Remove duplicated vertical lines
     intersections = {}
-    h_line = horizontal_lines[list(horizontal_lines.keys())[0]]
+    h_line0 = horizontal_lines[list(horizontal_lines.keys())[0]]
+    h_line1 = horizontal_lines[list(horizontal_lines.keys())[-1]]
     vert_line_to_remove = set() # TODO: Maybe check which lines are the straightest and keep that
     for key in vertical_lines:
         v_line = vertical_lines[key]
-        intersections[key] = intersection_lines(h_line, v_line)
+        intersections[key] = intersection_lines(h_line0, v_line), intersection_lines(h_line1, v_line)
         
     for key in intersections:
         if key in vert_line_to_remove:
             continue
-        int1 = np.array(intersections[key])
+        int11 = np.array(intersections[key][0])
+        int12 = np.array(intersections[key][1])
         for key_ in intersections:
             if key == key_:
                 continue
-            int2 = np.array(intersections[key_])
-            distance = np.linalg.norm(int1-int2)
-            if distance < distance_to_remove:
+            int21 = np.array(intersections[key_][0])
+            int22 = np.array(intersections[key_][1])
+            distance = []
+            distance.append(np.linalg.norm(int11-int21))
+            distance.append(np.linalg.norm(int11-int22))
+            distance.append(np.linalg.norm(int12-int21))
+            distance.append(np.linalg.norm(int12-int22))
+            if np.any(np.array(distance) < distance_to_remove):
                 vert_line_to_remove.add(key_)
     
     for key in vert_line_to_remove:
@@ -344,7 +351,6 @@ def max_val_in_file_name(names, prefix):
         if n > max_val: max_val = n
     return max_val
 
-
 def generate_training_data():
     import os
     max_n = {}
@@ -411,9 +417,10 @@ def main(img_name="./img/sudoko.png"):
     cv2.imshow("board", img)
     cv2.waitKey(0)
 
-    h_lines, v_lines = lines_forming_sudoko(lines, height_max, width_max, img=sudoko_warped) #TODO: Make sure there are 10*10 lines
-    # img_sudoko_lines = draw_lines(sudoko_warped_grey, h_lines)
-    img_sudoko_lines = draw_lines(sudoko_warped_grey, v_lines)
+    # h_lines, v_lines = lines_forming_sudoko(lines, height_max, width_max, img=sudoko_warped) #TODO: Make sure there are 10*10 lines
+    h_lines, v_lines = lines_forming_sudoko(lines, height_max, width_max) #TODO: Make sure there are 10*10 lines
+    img_sudoko_lines = draw_lines(sudoko_warped_grey, h_lines)
+    img_sudoko_lines = draw_lines(img_sudoko_lines, v_lines)
     cv2.imshow("Lines forming soduko",  img_sudoko_lines)
     cv2.waitKey(0)
 
