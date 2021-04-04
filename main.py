@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from numpy.core.fromnumeric import trace
 from line_test import extend_lines, construct_line, intersection_lines
 
 def create_base_board():
@@ -122,7 +123,7 @@ def calc_angle_of_lines(lines):
         angle_of_lines[tuple(line)] = angle
     return angle_of_lines
     
-def eliminate_unrelated_lines(lines, epsilon = 2*np.pi/180, n_neighbours=10):
+def eliminate_unrelated_lines(lines, epsilon = 10*np.pi/180, n_neighbours=20):
     angle_of_lines = calc_angle_of_lines(lines)
     good_lines = []
     
@@ -138,7 +139,7 @@ def eliminate_unrelated_lines(lines, epsilon = 2*np.pi/180, n_neighbours=10):
     
     return good_lines
 
-def eliminate_duplicate_lines(lines, epsilon_angle =  10*np.pi/180, intersection_distance=1e3):
+def eliminate_duplicate_lines(lines, epsilon_angle =  10*np.pi/180, intersection_distance=500):
     angle_of_lines = calc_angle_of_lines(lines)
     good_lines = {}
     
@@ -236,7 +237,7 @@ def show_lines(text, lines, img):
     cv2.destroyWindow(text)
     test = 5
 
-def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 50*np.pi/180, img=None):
+def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/180, img=None, max_increase_factor=1.05):
     horizontal_lines = {}
     vertical_lines = {}
 
@@ -250,8 +251,8 @@ def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 50*np.pi/
             vertical_lines[line[1]] = line
 
     # Remove all lines which intersect with the board outside of the image
-    v0 = [0,0,0,height_max]
-    h0 = [0,0,width_max,0]
+    v0 = [0,0,0,height_max*max_increase_factor]
+    h0 = [0,0,width_max*max_increase_factor,0]
     hor_line_to_remove = []
     for key in horizontal_lines:
         x,y = intersection_lines(horizontal_lines[key], v0)
@@ -353,6 +354,7 @@ def max_val_in_file_name(names, prefix):
 
 def generate_training_data():
     import os
+    import traceback
     max_n = {}
     for i in range(1,10):
         names = os.listdir("./img/numbers/" + str(i))
@@ -364,7 +366,12 @@ def generate_training_data():
     for sudokok in sudokos_to_do:
         name = "./img/sudoko/todo/" +  sudokok
         cells, img = main(name)
-        show_all_cells_and_store(cells, img, max_n)
+        try:
+            show_all_cells_and_store(cells, img, max_n)
+        except:
+            traceback.print_exc()
+            print("Something went wrong with this image.\nMoving on to the next.")
+
         os.replace(name, "./img/sudoko/done/" +  sudokok)
 
     
@@ -435,10 +442,11 @@ def main(img_name="./img/sudoko.png"):
     cv2.waitKey(0)
 
     cells = extract_cells(v_lines, h_lines)
-    show_all_cells(cells, sudoko_warped_grey)
+    # show_all_cells(cells, sudoko_warped_grey)
+    cv2.destroyAllWindows()
     return cells, sudoko_warped_grey
 
 if __name__ == '__main__':
-    main()
-    # generate_training_data()
+    # main(img_name="./img/sudoko2.png")
+    generate_training_data()
 
