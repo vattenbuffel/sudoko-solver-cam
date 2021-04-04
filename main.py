@@ -169,7 +169,7 @@ def eliminate_duplicated_line_after_warp(lines, epsilon_angle =  10*np.pi/180, d
         if np.abs(angle_of_lines[line]) < epsilon_angle:
             horizontal_lines[line[0]] = line
 
-        if np.abs(np.pi/2 - angle_of_lines[line]) < epsilon_angle:
+        if np.abs(np.pi/2 - np.abs(angle_of_lines[line])) < epsilon_angle:
             vertical_lines[line[1]] = line
 
     # Remove duplicated vertical lines
@@ -221,8 +221,15 @@ def eliminate_duplicated_line_after_warp(lines, epsilon_angle =  10*np.pi/180, d
 
     return list(horizontal_lines.values()), list(vertical_lines.values())
 
+def show_lines(text, lines, img):
+    assert len(lines[0]) == 4, "The shape of lines must be (-1,4)."
+    img_with_line_to_remove = draw_lines(np.copy(img), [np.array(line, dtype='int') for line in lines])
+    cv2.imshow(text, img_with_line_to_remove)
+    cv2.waitKey(0)
+    cv2.destroyWindow(text)
+    test = 5
 
-def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/180):
+def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 50*np.pi/180, img=None):
     horizontal_lines = {}
     vertical_lines = {}
 
@@ -232,7 +239,7 @@ def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/
         if np.abs(angle_of_lines[line]) < epsilon_angle:
             horizontal_lines[line[0]] = line
 
-        if np.abs(np.pi/2 - angle_of_lines[line]) < epsilon_angle:
+        if np.abs(np.pi/2 - np.abs(angle_of_lines[line])) < epsilon_angle:
             vertical_lines[line[1]] = line
 
     # Remove all lines which intersect with the board outside of the image
@@ -243,6 +250,11 @@ def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/
         x,y = intersection_lines(horizontal_lines[key], v0)
         if x < 0 or x >= width_max or y < 0 or y >= height_max:
             hor_line_to_remove.append(key)
+            
+            # Show the line about to be removed
+            if img is not None:
+                show_lines("horizontal line to remove", [horizontal_lines[key]], img)
+
     for key in hor_line_to_remove: 
         del horizontal_lines[key]
 
@@ -251,6 +263,11 @@ def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/
         x,y = intersection_lines(vertical_lines[key], h0)
         if x < 0 or x >= width_max or y < 0 or y >= height_max:
             vert_line_to_remove.append(key)
+            
+            # Show the line about to be removed
+            if img is not None:
+                show_lines("vertical line to remove", [vertical_lines[key]], img)
+
     for key in vert_line_to_remove: 
         del vertical_lines[key]
 
@@ -394,9 +411,9 @@ def main(img_name="./img/sudoko.png"):
     cv2.imshow("board", img)
     cv2.waitKey(0)
 
-    h_lines, v_lines = lines_forming_sudoko(lines, height_max, width_max) #TODO: Make sure there are 10*10 lines
-    img_sudoko_lines = draw_lines(sudoko_warped_grey, h_lines)
-    img_sudoko_lines = draw_lines(img_sudoko_lines, v_lines)
+    h_lines, v_lines = lines_forming_sudoko(lines, height_max, width_max, img=sudoko_warped) #TODO: Make sure there are 10*10 lines
+    # img_sudoko_lines = draw_lines(sudoko_warped_grey, h_lines)
+    img_sudoko_lines = draw_lines(sudoko_warped_grey, v_lines)
     cv2.imshow("Lines forming soduko",  img_sudoko_lines)
     cv2.waitKey(0)
 
