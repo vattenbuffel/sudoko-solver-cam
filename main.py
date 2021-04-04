@@ -138,7 +138,7 @@ def eliminate_unrelated_lines(lines, epsilon = 2*np.pi/180, n_neighbours=10):
     
     return good_lines
 
-def eliminate_duplicate_lines(lines, epsilon =  10*np.pi/180, intersection_distance=1e3):
+def eliminate_duplicate_lines(lines, epsilon_angle =  10*np.pi/180, intersection_distance=1e3):
     angle_of_lines = calc_angle_of_lines(lines)
     good_lines = {}
     
@@ -148,19 +148,81 @@ def eliminate_duplicate_lines(lines, epsilon =  10*np.pi/180, intersection_dista
 
         for line_ in good_lines:
             angle_ = angle_of_lines[line_]
-            if np.abs(angle-angle_) < epsilon:
+            if np.abs(angle-angle_) < epsilon_angle:
                 x,y = intersection_lines(line, line_)
                 if x is not None and (x**2+y**2)**0.5 < intersection_distance:
                     duplicate = True
                     break
 
-
         if not duplicate:
             good_lines[line] = angle
-    
+
     return list(good_lines.keys())
 
-def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/180, distance_to_remove=20):
+def eliminate_duplicated_line_after_warp(lines, epsilon_angle =  10*np.pi/180, distance_to_remove=20):
+    # Figure out which lines are vertical and horizontal
+    horizontal_lines = {}
+    vertical_lines = {}
+    angle_of_lines = calc_angle_of_lines(lines)
+    
+    for line in angle_of_lines:
+        if np.abs(angle_of_lines[line]) < epsilon_angle:
+            horizontal_lines[line[0]] = line
+
+        if np.abs(np.pi/2 - angle_of_lines[line]) < epsilon_angle:
+            vertical_lines[line[1]] = line
+
+    # Remove duplicated vertical lines
+    intersections = {}
+    h_line = horizontal_lines[list(horizontal_lines.keys())[0]]
+    vert_line_to_remove = set() # TODO: Maybe check which lines are the straightest and keep that
+    for key in vertical_lines:
+        v_line = vertical_lines[key]
+        intersections[key] = intersection_lines(h_line, v_line)
+        
+    for key in intersections:
+        if key in vert_line_to_remove:
+            continue
+        int1 = np.array(intersections[key])
+        for key_ in intersections:
+            if key == key_:
+                continue
+            int2 = np.array(intersections[key_])
+            distance = np.linalg.norm(int1-int2)
+            if distance < distance_to_remove:
+                vert_line_to_remove.add(key_)
+    
+    for key in vert_line_to_remove:
+        del vertical_lines[key]
+
+    intersections = {}
+    v_line = vertical_lines[list(vertical_lines.keys())[0]]
+    hort_line_to_remove = set()
+    for key in horizontal_lines:
+        h_line = horizontal_lines[key]
+        intersection = intersection_lines(h_line, v_line)
+        assert intersection[0] is not None
+        intersections[key] = intersection
+        
+    for key in intersections:
+        if key in hort_line_to_remove:
+            continue
+        int1 = np.array(intersections[key])
+        for key_ in intersections:
+            if key == key_:
+                continue
+            int2 = np.array(intersections[key_])
+            distance = np.linalg.norm(int1-int2)
+            if distance < distance_to_remove:
+                hort_line_to_remove.add(key_)
+        
+    for key in hort_line_to_remove:
+        del horizontal_lines[key]
+
+    return list(horizontal_lines.values()), list(vertical_lines.values())
+
+
+def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/180):
     horizontal_lines = {}
     vertical_lines = {}
 
@@ -191,58 +253,6 @@ def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/
             vert_line_to_remove.append(key)
     for key in vert_line_to_remove: 
         del vertical_lines[key]
-
-
-    # TODO: Move this into remove duplicate lines function
-    # Remove duplicated vertical lines
-    intersections = {}
-    h_line = horizontal_lines[list(horizontal_lines.keys())[0]]
-    vert_line_to_remove = set()
-    for key in vertical_lines:
-        v_line = vertical_lines[key]
-        intersections[key] = intersection_lines(h_line, v_line)
-        
-    for key in intersections:
-        if key in vert_line_to_remove:
-            continue
-        int1 = np.array(intersections[key])
-        for key_ in intersections:
-            if key == key_:
-                continue
-            int2 = np.array(intersections[key_])
-            distance = np.linalg.norm(int1-int2)
-            if distance < distance_to_remove:
-                vert_line_to_remove.add(key_)
-    
-    for key in vert_line_to_remove:
-        del vertical_lines[key]
-
-
-    intersections = {}
-    v_line = vertical_lines[list(vertical_lines.keys())[0]]
-    hort_line_to_remove = set()
-    for key in horizontal_lines:
-        h_line = horizontal_lines[key]
-        intersection = intersection_lines(h_line, v_line)
-        assert intersection[0] is not None
-        intersections[key] = intersection
-        
-    for key in intersections:
-        if key in hort_line_to_remove:
-            continue
-        int1 = np.array(intersections[key])
-        for key_ in intersections:
-            if key == key_:
-                continue
-            int2 = np.array(intersections[key_])
-            distance = np.linalg.norm(int1-int2)
-            if distance < distance_to_remove:
-                hort_line_to_remove.add(key_)
-    
-    for key in hort_line_to_remove:
-        del horizontal_lines[key]
-
-    # END OF TODO
 
     return list(horizontal_lines.values()), list(vertical_lines.values())
     
@@ -363,7 +373,7 @@ def main(img_name="./img/sudoko.png"):
     cv2.imshow("removed unrelated lines", draw_lines(np.copy(img_edges), lines))
     cv2.waitKey(0)
     lines = eliminate_duplicate_lines(lines)
-    cv2.imshow("removed duplicated lines", draw_lines(np.copy(img_edges), lines))
+    cv2.imshow("removed duplicated lines before warp", draw_lines(np.copy(img_edges), lines))
     cv2.waitKey(0)
 
 
@@ -375,6 +385,7 @@ def main(img_name="./img/sudoko.png"):
     sudoko_warped = cv2.warpPerspective(img_edges, h, (width_max, height_max), flags=cv2.INTER_LINEAR)    
     sudoko_warped_grey = cv2.warpPerspective(img_sudoko_color, h, (width_max, height_max), flags=cv2.INTER_LINEAR)
     lines = warp_lines(lines, h)
+    lines = [construct_line(line[:2], line[2:4]) for line in lines]
     img_lines = draw_lines(np.copy(sudoko_warped), lines)
     cv2.imshow("warped img and lines", img_lines)
     cv2.waitKey(0)
@@ -383,11 +394,16 @@ def main(img_name="./img/sudoko.png"):
     cv2.imshow("board", img)
     cv2.waitKey(0)
 
-    lines = [construct_line(line[:2], line[2:4]) for line in lines]
     h_lines, v_lines = lines_forming_sudoko(lines, height_max, width_max) #TODO: Make sure there are 10*10 lines
     img_sudoko_lines = draw_lines(sudoko_warped_grey, h_lines)
     img_sudoko_lines = draw_lines(img_sudoko_lines, v_lines)
     cv2.imshow("Lines forming soduko",  img_sudoko_lines)
+    cv2.waitKey(0)
+
+    h_lines, v_lines = eliminate_duplicated_line_after_warp(h_lines + v_lines)
+    img_sudoko_lines = draw_lines(sudoko_warped_grey, h_lines)
+    img_sudoko_lines = draw_lines(img_sudoko_lines, v_lines)
+    cv2.imshow("removed duplicated lines after warp", img_sudoko_lines)
     cv2.waitKey(0)
 
     img = combine_images([img_lines, img_sudoko_lines])
