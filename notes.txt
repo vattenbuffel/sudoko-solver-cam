@@ -1,0 +1,16 @@
+Capture img
+Find sudoko board
+Untilt it
+Remove all but sudoko board
+Change white to white and black to black
+Loop through cells to figure out what is in each cell
+Solve sudoko
+Display sudoko
+
+
+
+Find sudoko board:
+	
+
+
+
