@@ -112,7 +112,7 @@ if __name__ == '__main__':
     # test
     assert extend_line([341,209,533,206], x_max=1280, y_max=720)[0] == 0 and extend_line([341,209,533,206], x_max=1280, y_max=720)[2] == 1280
     assert extend_line([295,535,682,548], x_max=1280, y_max=720)[0] == 0 and extend_line([295,535,682,548], x_max=1280, y_max=720)[2] == 1280
-
+    extend_line([37, 638, 410, 731], x_max=1280, y_max=720)
 
 
 

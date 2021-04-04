@@ -410,8 +410,8 @@ def extract_numbers_and_cells(img):
 
     # Clean some lines
     lines = [construct_line(line[:2], line[2:]) for line in lines]
-    # lines = extend_lines(lines, x_max=width_max, y_max=height_max, img = img_edges)
-    lines = extend_lines(lines, x_max=width_max, y_max=height_max)
+    # lines = extend_lines(lines, x_max=img_sudoko_color.shape[1], y_max=img_sudoko_color.shape[0], img = img_edges)
+    lines = extend_lines(lines, x_max=img_sudoko_color.shape[1], y_max=img_sudoko_color.shape[0])
     lines = np.ceil(lines).astype('int')
     assert np.all(np.diff(np.array(lines)[:,(0,2)],axis=1) >= 0), f"P1 should be to the right of P0."
     cv2.imshow("extended lines", draw_lines(np.copy(img_edges), lines))
@@ -471,8 +471,10 @@ if __name__ == '__main__':
     
     digit_recognizer = load_model()
     board = build_board(cells, img_warped, digit_recognizer)
-    solve(board)
-
+    try:
+        solve(board)
+    except:
+        print("Invalid board")
 
     # generate_training_data()
 
