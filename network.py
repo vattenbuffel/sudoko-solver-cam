@@ -27,11 +27,13 @@ class Digit_recognizer(nn.Module):
         super().__init__()
         
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=20, kernel_size=3)
-        # self.conv2 = nn.Conv2d(in_channels=20, out_channels=20, kernel_size=3)
+        self.conv2 = nn.Conv2d(in_channels=20, out_channels=20, kernel_size=3)
+        self.conv3 = nn.Conv2d(in_channels=20, out_channels=20, kernel_size=3)
         
-        self.linear_regression_vector_length = (image_width-(3-1))**2*20# This assumes stride 1
+        # self.linear_regression_vector_length = (image_width-(3-1))**2*20# This assumes stride 1
+        self.linear_regression_vector_length = (image_width-3*(3-1))**2*20# This assumes stride 1
         self.nn1 = nn.Linear(self.linear_regression_vector_length, 10)
-        self.layers = [self.conv1, self.nn1]
+        self.layers = [self.conv1, self.conv2, self.conv3, self.nn1]
             
         self.layers = nn.ModuleList(self.layers)
         print("created a network with layers:\n",self.layers)
@@ -47,8 +49,13 @@ class Digit_recognizer(nn.Module):
         
     def forward(self, x): 
         x = self.layers[0](x)
-        x = torch.reshape(x, (-1, self.linear_regression_vector_length))
+        x = F.relu(x)
         x = self.layers[1](x)
+        x = F.relu(x)
+        x = self.layers[2](x)
+        x = F.relu(x)
+        x = torch.reshape(x, (-1, self.linear_regression_vector_length))
+        x = self.layers[-1](x)
         x = F.log_softmax(x)
             
         return x

@@ -464,7 +464,7 @@ def extract_numbers_and_cells(img):
     return cells, sudoko_warped_grey
 
 if __name__ == '__main__':
-    img_name="./img/sudoko4.png"
+    img_name="./img/sudoko1.png"
     img = cv2.imread(img_name)
     cells, img_warped = extract_numbers_and_cells(img)
 
