@@ -27,14 +27,18 @@ class Digit_recognizer(nn.Module):
         super().__init__()
         
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=20, kernel_size=3)
-        self.conv2 = nn.Conv2d(in_channels=20, out_channels=20, kernel_size=3)
-        self.conv3 = nn.Conv2d(in_channels=20, out_channels=20, kernel_size=3)
-        
-        # self.linear_regression_vector_length = (image_width-(3-1))**2*20# This assumes stride 1
-        self.linear_regression_vector_length = (image_width-3*(3-1))**2*20# This assumes stride 1
-        self.nn1 = nn.Linear(self.linear_regression_vector_length, 10)
-        self.layers = [self.conv1, self.conv2, self.conv3, self.nn1]
-            
+        self.norm1 = nn.BatchNorm2d(20)
+        self.conv2 = nn.Conv2d(in_channels=20, out_channels=40, kernel_size=3)
+        self.norm2 = nn.BatchNorm2d(40)
+        self.max_pool1 = nn.MaxPool2d(kernel_size=3, stride=3)
+        self.conv3 = nn.Conv2d(in_channels=40, out_channels=60, kernel_size=3)
+        self.dropout1 = nn.Dropout(p=0.3, inplace=False)
+        self.dropout2 = nn.Dropout(p=0.3, inplace=False)
+        self.linear_regression_vector_length = 1440
+        self.nn1 = nn.Linear(self.linear_regression_vector_length, 256)
+        self.nn2 = nn.Linear(256, 9)
+
+        self.layers = [self.conv1, self.norm1, self.conv2, self.max_pool1, self.conv3, self.nn1]
         self.layers = nn.ModuleList(self.layers)
         print("created a network with layers:\n",self.layers)
         
@@ -48,14 +52,27 @@ class Digit_recognizer(nn.Module):
         self.transforms = transforms
         
     def forward(self, x): 
-        x = self.layers[0](x)
+        x = self.conv1(x)
+        x = self.dropout1(x)
         x = F.relu(x)
-        x = self.layers[1](x)
+
+        
+        x = self.norm1(x)
+        x = self.max_pool1(x)
+        x = self.conv2(x)
+        x = self.dropout2(x)
         x = F.relu(x)
-        x = self.layers[2](x)
-        x = F.relu(x)
+
+        # x = self.norm2(x)
+        # x = self.max_pool1(x)
+        # x = self.conv3(x)
+        # x = F.relu(x)
+
         x = torch.reshape(x, (-1, self.linear_regression_vector_length))
-        x = self.layers[-1](x)
+        x = self.nn1(x)
+        x = F.relu(x)
+
+        x = self.nn2(x)
         x = F.log_softmax(x)
             
         return x
@@ -67,8 +84,9 @@ class Digit_recognizer(nn.Module):
         self.optimizer.zero_grad()
         return loss
     
-    def train_(self, train_loader, val_loader, epochs, dict_of_loss_and_accuracy = None):
+    def train_(self, train_loader, val_loader, epochs, dict_of_loss_and_accuracy = None, save_best=True):
         train_n = len(train_loader.dataset)
+        lowest_val_loss = 1e10
         
         for i in range(epochs):
             losses = []
@@ -92,6 +110,8 @@ class Digit_recognizer(nn.Module):
                 dict_of_loss_and_accuracy['validation_loss'].append(val_avg_loss)
                 dict_of_loss_and_accuracy['training_accuracy'].append(train_accuracy)
                 dict_of_loss_and_accuracy['validation_accuracy'].append(val_accuracy)
+                if save_best and lowest_val_loss > val_avg_loss:
+                    torch.save(self.state_dict(), "network")
 
             print("After epoch: {}\tVal_avg_loss: {:.3f}\tTrain_avg_loss: {:.3f}\tVal_accuracy: {:.3f}\tTrain_accuracy: {:.3f}".format(i, val_avg_loss, train_avg_loss, val_accuracy, train_accuracy))
 
@@ -118,9 +138,8 @@ class Digit_recognizer(nn.Module):
         img_processed = self.transforms(img_pil)
         img_processed = img_processed.reshape(1,img_processed.shape[0], img_processed.shape[1], img_processed.shape[2])
         with torch.no_grad():
-            prediction = self(img_processed)
-        return torch.argmax(prediction[0]).item() + 1
-
+            prediction = self(img_processed.to(device))
+        return torch.argmax(prediction[0]).item()+1
 
     def compare_transformss(self, transformations, index):
         """Visually compare transformations side by side.
@@ -191,29 +210,27 @@ class Digit_recognizer(nn.Module):
 
 def load_model(path="network"):
     model = Digit_recognizer(Compose(list_of_transforms))
-    # digit_recognizer = model.load_state_dict(torch.load("network"))
-    model.load_state_dict(torch.load("network"))
+    model.load_state_dict(torch.load(path))
     return model
 
 
-image_width = 50
-list_of_transforms = [transforms.Resize((image_width,image_width)), 
+image_width = 28
+list_of_transforms = [transforms.Resize((image_width,image_width)),  
+                    # transforms.CenterCrop(23),
                     transforms.Grayscale(1), 
                     transforms.ToTensor()]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:",device)
+print("Using device:", device)
 
 if __name__ == '__main__':
-    train_path = "./img/numbers"
-    val_path = "./img/numbers"
-    # train_path = "./img/numbers/9"
-    # val_path = "./img/numbers/9"
+    train_path = "./img/datasets/combined/training-set/"
+    val_path = "./img/datasets/combined/validation-set/"
 
     batch_size = 32
     num_workers = 1
-    learning_rate = 0.005
-    n_epochs = 25
+    learning_rate = 0.0005
+    n_epochs = 100
     
     digit_recognizer = Digit_recognizer(Compose(list_of_transforms), learning_rate = learning_rate)
 
@@ -231,12 +248,10 @@ if __name__ == '__main__':
     dict_of_loss_and_accuracy = {'training_loss':[], 'validation_loss':[], 'training_accuracy':[], 'validation_accuracy':[]}
     digit_recognizer.train_(train_loader, val_loader, n_epochs, dict_of_loss_and_accuracy=dict_of_loss_and_accuracy)
 
-    torch.save(digit_recognizer.state_dict(), "network")
+    # torch.save(digit_recognizer.state_dict(), "network")
 
 
 
-
-    bajs = 5
 
 
 

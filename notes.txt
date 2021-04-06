@@ -13,10 +13,11 @@ todo:
     1) Split data into training and validation
     2) Add more data
     3) Improve network, Investigate max pooling and batch norm2D
-    4) Remove need for manual keypoint input
-    5) Add checks for if a valid board was found
-    6) Use webcam
-    7) Create an image of the finalized sudoko and show it
+    4) Remove need for manual keypoint input, experiment with moving the homography part first
+    5) Try to only keep the straightest lines
+    6) Add checks for if a valid board was found
+    7) Use webcam
+    8) Create an image of the finalized sudoko and show it
 	
 
 

@@ -12,7 +12,7 @@ while(True):
         cv2.imshow('frame',img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             # cv2.imwrite("./img/sudoko.png", img)
-            cv2.imwrite("./img/todo/"+str(time.time()) + ".png", img)
+            cv2.imwrite("./img/"+str(time.time()) + ".png", img)
             break
         
 

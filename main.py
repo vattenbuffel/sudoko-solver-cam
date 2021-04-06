@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from numpy.core.fromnumeric import trace
 from line_test import extend_lines, construct_line, intersection_lines
 from solver import solve
 from network import load_model
@@ -367,7 +366,8 @@ def generate_training_data():
     sudokos_to_do = os.listdir("./img/sudoko/todo")
     for sudokok in sudokos_to_do:
         name = "./img/sudoko/todo/" +  sudokok
-        cells, img = main(name)
+        img = cv2.imread(name)
+        cells, img = extract_numbers_and_cells(img)
         try:
             show_all_cells_and_store(cells, img, max_n)
         except:
@@ -376,22 +376,35 @@ def generate_training_data():
 
         os.replace(name, "./img/sudoko/done/" +  sudokok)
 
-def build_board(cells, img, digit_recognizer):
+def build_board(cells, img, digit_recognizer, pixel_threshold_value=70, show=True, crop_val=15, blank_threshold=0.99):
     board = np.zeros((9,9), dtype='int')
     for cell in cells:
         p = cells[cell]
         p0 = np.array([p[0], p[1]], dtype='int')
         p1 = np.array([p[2], p[3]], dtype='int')
-        img_digit = img[p0[1]:p1[1], p0[0]:p1[0]]
-        val = digit_recognizer.predict_on_image(img_digit)
+        img_digit = img[p0[1]:p1[1], p0[0]:p1[0]][crop_val:-crop_val,crop_val:-crop_val]
 
-        # If it's blank, change val to 0
-        if val == 10:
+        # Change black to black and white to white
+        img_digit[np.any(img_digit[:,:] < np.array([pixel_threshold_value,pixel_threshold_value,pixel_threshold_value]), axis=2)] = 0
+        img_digit[np.any(img_digit[:,:] > np.array([pixel_threshold_value,pixel_threshold_value,pixel_threshold_value]), axis=2)] = 255
+
+        # Check if the center 50 % of the img is almost empty
+        height, width = img_digit.shape[:2]
+        center_img = img_digit[int(height*0.25):-int(height*0.25),int(width*0.25):-int(width*0.25)]
+        if np.sum(center_img/255)/np.prod(center_img.shape) > blank_threshold:
             val = 0
+        else:
+            val = digit_recognizer.predict_on_image(img_digit)
+
+        if show:
+            print(f"Predicted {val}")
+            cv2.imshow("prediction", img_digit)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
         board[cell] = val
     
     return board
-
 
 def extract_numbers_and_cells(img):
     img_sudoko_color = img
@@ -464,13 +477,13 @@ def extract_numbers_and_cells(img):
     return cells, sudoko_warped_grey
 
 if __name__ == '__main__':
-    img_name="./img/sudoko1.png"
+    img_name="./img/sudoko4.png"
     img = cv2.imread(img_name)
     cells, img_warped = extract_numbers_and_cells(img)
 
     
     digit_recognizer = load_model()
-    board = build_board(cells, img_warped, digit_recognizer)
+    board = build_board(cells, img_warped, digit_recognizer, show=False)
     try:
         solve(board)
     except:
