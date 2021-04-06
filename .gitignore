@@ -6,7 +6,7 @@ __pycache__/
 # C extensions
 *.so
 
-img/datasets/
+img/datasets/*
 !img/datasets/sodoku-numbers
 
 # Distribution / packaging

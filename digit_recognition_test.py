@@ -10,12 +10,11 @@ if __name__ == '__main__':
     while True:
         path = "./img/datasets/combined/validation-set/"
         number_to_show = np.random.choice(os.listdir(path))
-        # number_to_show = "0"
         path += number_to_show +"/"
         img_path = np.random.choice(os.listdir(path))
         path = path + img_path
 
-        img = cv2.imread(path)[10:-10,10:-10]
+        img = cv2.imread(path)#[10:-10,10:-10]
         cv2.imshow("number", img)
         pred = digit_recognizer.predict_on_image(img)
         print(pred)

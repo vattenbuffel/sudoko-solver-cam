@@ -26,21 +26,19 @@ class Digit_recognizer(nn.Module):
     def __init__(self, transforms, outputs=None, L2_penalty=0, learning_rate=0.01):
         super().__init__()
         
+        
+        self.norm0 = nn.BatchNorm2d(1)
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=20, kernel_size=3)
         self.norm1 = nn.BatchNorm2d(20)
         self.conv2 = nn.Conv2d(in_channels=20, out_channels=40, kernel_size=3)
         self.norm2 = nn.BatchNorm2d(40)
-        self.max_pool1 = nn.MaxPool2d(kernel_size=3, stride=3)
+        self.max_pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv3 = nn.Conv2d(in_channels=40, out_channels=60, kernel_size=3)
-        self.dropout1 = nn.Dropout(p=0.3, inplace=False)
-        self.dropout2 = nn.Dropout(p=0.3, inplace=False)
-        self.linear_regression_vector_length = 1440
+        self.dropout1 = nn.Dropout(p=0.2, inplace=False)
+        self.dropout2 = nn.Dropout(p=0.2, inplace=False)
+        self.linear_regression_vector_length = 960
         self.nn1 = nn.Linear(self.linear_regression_vector_length, 256)
         self.nn2 = nn.Linear(256, 9)
-
-        self.layers = [self.conv1, self.norm1, self.conv2, self.max_pool1, self.conv3, self.nn1]
-        self.layers = nn.ModuleList(self.layers)
-        print("created a network with layers:\n",self.layers)
         
         self.loss_fn = nn.NLLLoss()
         self.optimizer = optim.Adam(self.parameters(), learning_rate,  weight_decay = L2_penalty) # weight_decay is the alpha in weight penalty regularization
@@ -52,6 +50,7 @@ class Digit_recognizer(nn.Module):
         self.transforms = transforms
         
     def forward(self, x): 
+        x = self.norm0(x)
         x = self.conv1(x)
         x = self.dropout1(x)
         x = F.relu(x)
@@ -63,10 +62,10 @@ class Digit_recognizer(nn.Module):
         x = self.dropout2(x)
         x = F.relu(x)
 
-        # x = self.norm2(x)
-        # x = self.max_pool1(x)
-        # x = self.conv3(x)
-        # x = F.relu(x)
+        x = self.norm2(x)
+        x = self.max_pool1(x)
+        x = self.conv3(x)
+        x = F.relu(x)
 
         x = torch.reshape(x, (-1, self.linear_regression_vector_length))
         x = self.nn1(x)
@@ -214,7 +213,7 @@ def load_model(path="network"):
     return model
 
 
-image_width = 28
+image_width = 30
 list_of_transforms = [transforms.Resize((image_width,image_width)),  
                     # transforms.CenterCrop(23),
                     transforms.Grayscale(1), 
