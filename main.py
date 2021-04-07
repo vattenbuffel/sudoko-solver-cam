@@ -3,6 +3,7 @@ import numpy as np
 from line_test import extend_lines, construct_line, intersection_lines
 from solver import solve
 from network import load_model
+from corner_detection_test2 import extract_board
 
 def create_base_board():
     # Create a base sudoko board
@@ -161,7 +162,7 @@ def eliminate_duplicate_lines(lines, epsilon_angle =  10*np.pi/180, intersection
 
     return list(good_lines.keys())
 
-def eliminate_duplicated_line_after_warp(lines, epsilon_angle =  10*np.pi/180, distance_to_remove=20):
+def eliminate_duplicated_line_after_warp(lines, epsilon_angle =  10*np.pi/180, distance_to_remove=10):
     # Figure out which lines are vertical and horizontal
     horizontal_lines = {}
     vertical_lines = {}
@@ -169,10 +170,10 @@ def eliminate_duplicated_line_after_warp(lines, epsilon_angle =  10*np.pi/180, d
     
     for line in angle_of_lines:
         if np.abs(angle_of_lines[line]) < epsilon_angle:
-            horizontal_lines[line[0]] = line
+            horizontal_lines[line[1]] = line
 
         if np.abs(np.pi/2 - np.abs(angle_of_lines[line])) < epsilon_angle:
-            vertical_lines[line[1]] = line
+            vertical_lines[line[0]] = line
 
     # Remove duplicated vertical lines
     intersections = {}
@@ -376,17 +377,21 @@ def generate_training_data():
 
         os.replace(name, "./img/sudoko/done/" +  sudokok)
 
-def build_board(cells, img, digit_recognizer, pixel_threshold_value=70, show=True, crop_val=15, blank_threshold=0.99):
+def build_board(cells, img, digit_recognizer, pixel_threshold_value=70, show=True, crop_val_factor=0.15, blank_threshold=0.99):
     board = np.zeros((9,9), dtype='int')
     for cell in cells:
         p = cells[cell]
         p0 = np.array([p[0], p[1]], dtype='int')
         p1 = np.array([p[2], p[3]], dtype='int')
-        img_digit = img[p0[1]:p1[1], p0[0]:p1[0]][crop_val:-crop_val,crop_val:-crop_val]
+        img_digit = img[p0[1]:p1[1], p0[0]:p1[0]]
+        y_crop, x_crop = int(img_digit.shape[0]*crop_val_factor), int(img_digit.shape[1]*crop_val_factor)
+        img_digit = img_digit[y_crop:-y_crop,x_crop:-x_crop]
 
         # Change black to black and white to white
-        img_digit[np.any(img_digit[:,:] < np.array([pixel_threshold_value,pixel_threshold_value,pixel_threshold_value]), axis=2)] = 0
-        img_digit[np.any(img_digit[:,:] > np.array([pixel_threshold_value,pixel_threshold_value,pixel_threshold_value]), axis=2)] = 255
+        img_digit = cv2.adaptiveThreshold(cv2.cvtColor(img_digit, cv2.COLOR_BGR2GRAY),255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV,11,3)
+        img_digit[img_digit==255] = 1
+        img_digit[img_digit==0] = 255
+        img_digit[img_digit==1] = 0
 
         # Check if the center 50 % of the img is almost empty
         height, width = img_digit.shape[:2]
@@ -408,6 +413,7 @@ def build_board(cells, img, digit_recognizer, pixel_threshold_value=70, show=Tru
 
 def extract_numbers_and_cells(img):
     img_sudoko_color = img
+    img_sudoko_color, M = extract_board(img)    
     width_max, height_max = 1280, 720
 
     img_sudoko = cv2.cvtColor(img_sudoko_color, cv2.COLOR_BGR2GRAY)
@@ -435,34 +441,9 @@ def extract_numbers_and_cells(img):
     lines = eliminate_duplicate_lines(lines)
     cv2.imshow("removed duplicated lines before warp", draw_lines(np.copy(img_edges), lines))
     cv2.waitKey(0)
-
-
-    base_kp = np.array([[0,0], [width_max,0], [width_max,height_max], [0,height_max]])
-    sudoko_kp = get_kp(np.copy(img_sudoko_color))
-    h, status = cv2.findHomography(np.array(sudoko_kp), base_kp, cv2.RANSAC,5.0)
     
-    # Warp source image to destination based on homography
-    sudoko_warped = cv2.warpPerspective(img_edges, h, (width_max, height_max), flags=cv2.INTER_LINEAR)    
-    sudoko_warped_grey = cv2.warpPerspective(img_sudoko_color, h, (width_max, height_max), flags=cv2.INTER_LINEAR)
-    lines = warp_lines(lines, h)
-    lines = [construct_line(line[:2], line[2:4]) for line in lines]
-    img_lines = draw_lines(np.copy(sudoko_warped), lines)
-    cv2.imshow("warped img and lines", img_lines)
-    cv2.waitKey(0)
-
-    img = combine_images([img_edges, sudoko_warped, img_lines])
-    cv2.imshow("board", img)
-    cv2.waitKey(0)
-
-    # h_lines, v_lines = lines_forming_sudoko(lines, height_max, width_max, img=sudoko_warped) #TODO: Make sure there are 10*10 lines
-    h_lines, v_lines = lines_forming_sudoko(lines, height_max, width_max) #TODO: Make sure there are 10*10 lines
-    img_sudoko_lines = draw_lines(sudoko_warped_grey, h_lines)
-    img_sudoko_lines = draw_lines(img_sudoko_lines, v_lines)
-    cv2.imshow("Lines forming soduko",  img_sudoko_lines)
-    cv2.waitKey(0)
-
-    h_lines, v_lines = eliminate_duplicated_line_after_warp(h_lines + v_lines)
-    img_sudoko_lines = draw_lines(sudoko_warped_grey, h_lines)
+    h_lines, v_lines = eliminate_duplicated_line_after_warp(lines)
+    img_sudoko_lines = draw_lines(img_sudoko, h_lines)
     img_sudoko_lines = draw_lines(img_sudoko_lines, v_lines)
     cv2.imshow("removed duplicated lines after warp", img_sudoko_lines)
     cv2.waitKey(0)
@@ -472,12 +453,11 @@ def extract_numbers_and_cells(img):
     cv2.waitKey(0)
 
     cells = extract_cells(v_lines, h_lines)
-    # show_all_cells(cells, sudoko_warped_grey)
     cv2.destroyAllWindows()
-    return cells, sudoko_warped_grey
+    return cells, img_sudoko_color
 
 if __name__ == '__main__':
-    img_name="./img/sudoko4.png"
+    img_name="./img/sudoko1.png"
     img = cv2.imread(img_name)
     cells, img_warped = extract_numbers_and_cells(img)
 
