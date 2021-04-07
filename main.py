@@ -14,29 +14,51 @@ def create_board(width, height, board, show=False):
 
     # Add boarders
     board_thickness = 1
+    thick_board_thickness = 3
     black = np.array([0,0,0], dtype='uint8')
     for row in range(9):
-        base_board[row*cell_height:row*cell_height+board_thickness, :] = black
+        thickness = board_thickness
+        if row %3 == 0:
+            thickness = thick_board_thickness
+        if row == 0:
+            thickness *= 2
+        base_board[row*cell_height:row*cell_height+thickness, :] = black
 
     for row in range(1, 9+1):
-        base_board[row*cell_height-board_thickness:row*cell_height, :] = black
+        thickness = board_thickness
+        if row % 3 == 0:
+            thickness = thick_board_thickness
+        if row == 9:
+            thickness *= 2
+        base_board[row*cell_height-thickness:row*cell_height, :] = black
 
     # Add col walls
     for col in range(9):
-        base_board[:, col*cell_width:col*cell_width+board_thickness] = black
+        thickness = board_thickness
+        if col %3 == 0:
+            thickness = thick_board_thickness
+        if col == 0:
+            thickness *= 2
+        base_board[:, col*cell_width:col*cell_width+thickness] = black
 
     for col in range(1, 9+1):
-        base_board[:, col*cell_width-board_thickness:col*cell_width] = black
+        thickness = board_thickness
+        if col %3 == 0:
+            thickness = thick_board_thickness
+        if col == 9:
+            thickness *= 2
+        base_board[:, col*cell_width-thickness:col*cell_width] = black
 
     # Add numbers
     font = cv2.FONT_HERSHEY_DUPLEX 
-    font_scale = 1.5
-    thickness = 2
-    x_offset = 15
+    font_scale = 1
+    thickness = 1
+    x_offset = 25
     y_offset = cell_height - 15
     for y, row in enumerate(board):
         for x, cell in enumerate(row):
-            num = cell.num
+            # num = cell.num
+            num = cell
             x0 = x*cell_width + x_offset
             y0 = y*cell_height + y_offset
 
@@ -497,6 +519,14 @@ def extract_numbers_and_cells(img):
     return cells, img_sudoko_color, img_lines
 
 if __name__ == '__main__':
+    board = np.random.randint(1,10,(9,9))
+    solved_board = create_board(640, 480, board)
+    cv2.imshow("Solution", solved_board)
+    cv2.waitKey(0)
+    exit(0)
+
+
+
     # img_name="./img/sudoko1.png"
     # img = cv2.imread(img_name)
     cap = cv2.VideoCapture(0)
@@ -520,8 +550,7 @@ if __name__ == '__main__':
                 print("Invalid board")
             
         else:
-            combined = combine_images([img, img])
-            cv2.imshow("Camera", combined)
+            cv2.imshow("Camera", img)
             cv2.waitKey(1)
 
     
