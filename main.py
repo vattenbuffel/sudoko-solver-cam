@@ -57,8 +57,7 @@ def create_board(width, height, board, show=False):
     y_offset = cell_height - 15
     for y, row in enumerate(board):
         for x, cell in enumerate(row):
-            # num = cell.num
-            num = cell
+            num = cell.num
             x0 = x*cell_width + x_offset
             y0 = y*cell_height + y_offset
 
@@ -519,14 +518,6 @@ def extract_numbers_and_cells(img):
     return cells, img_sudoko_color, img_lines
 
 if __name__ == '__main__':
-    board = np.random.randint(1,10,(9,9))
-    solved_board = create_board(640, 480, board)
-    cv2.imshow("Solution", solved_board)
-    cv2.waitKey(0)
-    exit(0)
-
-
-
     # img_name="./img/sudoko1.png"
     # img = cv2.imread(img_name)
     cap = cv2.VideoCapture(0)
