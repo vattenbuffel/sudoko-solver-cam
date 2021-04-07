@@ -568,5 +568,6 @@ def solve(board):
     end_time = time.time()
     print("It took", end_time-start_time, "s to solve!")
     board_print(board)
+    return board
 
 

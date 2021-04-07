@@ -5,10 +5,8 @@ from solver import solve
 from network import load_model
 from corner_detection_test2 import extract_board
 
-def create_base_board():
+def create_board(width, height, board, show=False):
     # Create a base sudoko board
-    width = width_max
-    height = height_max
     base_board = np.zeros((height, width, 3), dtype='uint8')
     base_board[:,:] = np.array([255,255,255])
     cell_height = height//9
@@ -29,6 +27,25 @@ def create_base_board():
 
     for col in range(1, 9+1):
         base_board[:, col*cell_width-board_thickness:col*cell_width] = black
+
+    # Add numbers
+    font = cv2.FONT_HERSHEY_DUPLEX 
+    font_scale = 1.5
+    thickness = 2
+    x_offset = 15
+    y_offset = cell_height - 15
+    for y, row in enumerate(board):
+        for x, cell in enumerate(row):
+            num = cell.num
+            x0 = x*cell_width + x_offset
+            y0 = y*cell_height + y_offset
+
+            cv2.putText(base_board, str(num), (x0,y0), font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
+            
+            if show:
+                cv2.imshow("number", base_board)
+                cv2.waitKey(0)
+
 
     return base_board
 
@@ -431,7 +448,7 @@ def extract_numbers_and_cells(img):
     lines = get_lines(img_edges)
     if lines is None or len(lines) < 50:
         return None
-    img_lines = draw_lines(np.copy(img_edges), lines)
+    img_lines = draw_lines(np.copy(img_sudoko_color), lines)
 
     # img = combine_images([img_sudoko_color, img_edges, img_lines])
     # cv2.imshow("board", img)
@@ -475,8 +492,9 @@ def extract_numbers_and_cells(img):
     for cell in cells:
         if not cell in good_cells:
             return None
+
     # cv2.destroyAllWindows()
-    return cells, img_sudoko_color
+    return cells, img_sudoko_color, img_lines
 
 if __name__ == '__main__':
     # img_name="./img/sudoko1.png"
@@ -487,18 +505,24 @@ if __name__ == '__main__':
         ret, img = cap.read()
         res = extract_numbers_and_cells(img)
         if res is not None:
-            cells, img_warped = res
+            cells, img_warped, img_lines = res
             board = build_board(cells, img_warped, digit_recognizer, show=False)
             try:
-                solve(board)
+                solution = solve(board)
+                solved_board = create_board(640, 480, solution)
+                combined = combine_images([img, solved_board])
+                cv2.destroyAllWindows()
+                cv2.imshow("Solution", combined)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
+                
             except:
                 print("Invalid board")
-            combined = combine_images([img, img_warped])
+            
         else:
-            # combined = combine_images([img, np.zeros((480,640,3))])
             combined = combine_images([img, img])
-        cv2.imshow("input, extracted", combined)
-        cv2.waitKey(1)
+            cv2.imshow("Camera", combined)
+            cv2.waitKey(1)
 
     
     # 
