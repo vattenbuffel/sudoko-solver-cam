@@ -1,9 +1,8 @@
 import cv2
 import numpy as np
-from line_test import extend_lines, construct_line, intersection_lines
+from line_math import extend_lines, construct_line, intersection_lines
 from solver import solve
 from network import load_model
-from corner_detection_test2 import extract_board
 
 def create_board(width, height, board, show=False):
     # Create a base sudoko board
@@ -117,46 +116,6 @@ def draw_lines(img, lines):
         l = lines[i]
         cv2.line(img_lines, (l[0], l[1]), (l[2], l[3]), (0,0,255), 3, cv2.LINE_AA)
     return img_lines
-
-def warp_lines(lines, h):
-    warped_lines = []
-    for line in lines:
-        p0 = np.array((list(line[:2]) + [1]))
-        p1 = np.array((list(line[2:4]) + [1]))
-
-        p0_warped = h@p0
-        p1_warped = h@p1
-        
-        p0_warped[:2]/=p0_warped[2]
-        p1_warped[:2]/=p1_warped[2]
-
-        warped_lines.append(np.array([p0_warped[0], p0_warped[1], p1_warped[0], p1_warped[1]], dtype='int'))
-
-    return warped_lines
-
-def calc_km(p0, p1):
-        k = (p1[1]-p0[1]) / (p1[0]-p0[0])
-        m = p1[1] - k*p1[0]
-        return k, m
-
-def get_kp(img):
-    # mouse callback function
-    def draw_circle(event,x,y,flags,param):
-        if event == cv2.EVENT_LBUTTONDBLCLK:
-            cv2.circle(img,(x,y),3,(255,0,0),-1)
-            kps.append(np.array([x,y]))
-    
-    kps = []
-    cv2.namedWindow('keypoints')
-    cv2.setMouseCallback('keypoints', draw_circle)
-    while(1):
-        cv2.imshow('keypoints', img)
-        if cv2.waitKey(20) & 0xFF == 27:
-            break
-        if len(kps) == 4:
-            break
-    cv2.destroyAllWindows()
-    return kps
 
 def calc_angle_of_lines(lines):
     angle_of_lines = {}
@@ -282,50 +241,6 @@ def show_lines(text, lines, img):
     cv2.waitKey(0)
     cv2.destroyWindow(text)
     test = 5
-
-def lines_forming_sudoko(lines, height_max, width_max, epsilon_angle = 10*np.pi/180, img=None, max_increase_factor=1.0):
-    horizontal_lines = {}
-    vertical_lines = {}
-
-    angle_of_lines = calc_angle_of_lines(lines)
-    
-    for line in angle_of_lines:
-        if np.abs(angle_of_lines[line]) < epsilon_angle:
-            horizontal_lines[line[0]] = line
-
-        if np.abs(np.pi/2 - np.abs(angle_of_lines[line])) < epsilon_angle:
-            vertical_lines[line[1]] = line
-
-    # Remove all lines which intersect with the board outside of the image
-    v0 = [0,0,0,height_max*max_increase_factor]
-    h0 = [0,0,width_max*max_increase_factor,0]
-    hor_line_to_remove = []
-    for key in horizontal_lines:
-        x,y = intersection_lines(horizontal_lines[key], v0)
-        if x < 0 or x >= width_max or y < 0 or y >= height_max:
-            hor_line_to_remove.append(key)
-            
-            # Show the line about to be removed
-            if img is not None:
-                show_lines("horizontal line to remove", [horizontal_lines[key]], img)
-
-    for key in hor_line_to_remove: 
-        del horizontal_lines[key]
-
-    vert_line_to_remove = []
-    for key in vertical_lines:
-        x,y = intersection_lines(vertical_lines[key], h0)
-        if x < 0 or x >= width_max or y < 0 or y >= height_max:
-            vert_line_to_remove.append(key)
-            
-            # Show the line about to be removed
-            if img is not None:
-                show_lines("vertical line to remove", [vertical_lines[key]], img)
-
-    for key in vert_line_to_remove: 
-        del vertical_lines[key]
-
-    return list(horizontal_lines.values()), list(vertical_lines.values())
     
 def extract_cells(v_lines, h_lines):
     h_lines_dict = {line[1]:line for line in h_lines}
@@ -517,9 +432,94 @@ def extract_numbers_and_cells(img):
     # cv2.destroyAllWindows()
     return cells, img_sudoko_color, img_lines
 
+def extract_board(image):
+    # Taken from https://stackoverflow.com/questions/57636399/how-to-detect-sudoku-grid-board-in-opencv
+
+    def perspective_transform(image, corners):
+        def order_corner_points(corners):
+            # Separate corners into individual points
+            # Index 0 - top-right
+            #       1 - top-left
+            #       2 - bottom-left
+            #       3 - bottom-right
+            if len(corners) < 4:
+                return None
+            corners = [(corner[0][0], corner[0][1]) for corner in corners]
+            top_r, top_l, bottom_l, bottom_r = corners[0], corners[1], corners[2], corners[3]
+            return (top_l, top_r, bottom_r, bottom_l)
+
+        # Order points in clockwise order
+        ordered_corners = order_corner_points(corners)
+        if ordered_corners is None:
+            return None
+        top_l, top_r, bottom_r, bottom_l = ordered_corners
+
+        # Move the corners outside to increase the square they envelop
+        # increase_factor = 0.1
+        # top_l = (top_l[0]*(1-increase_factor), top_l[1]*(1-increase_factor))
+        # top_r = (top_r[0]*(1+increase_factor), top_r[1]*(1-increase_factor))
+        # bottom_r = (bottom_r[0]*(1+increase_factor), bottom_r[1]*(1+increase_factor))
+        # bottom_l = (bottom_l[0]*(1-increase_factor), bottom_l[1]*(1+increase_factor))
+        top_l = (top_l[0]-10, top_l[1]-10)
+        top_r = (top_r[0]+10, top_r[1]-10)
+        bottom_r = (bottom_r[0]+10, bottom_r[1]+10)
+        bottom_l = (bottom_l[0]-10, bottom_l[1]+10)
+        ordered_corners = (top_l, top_r, bottom_r, bottom_l)
+
+
+
+        # Determine width of new image which is the max distance between 
+        # (bottom right and bottom left) or (top right and top left) x-coordinates
+        width_A = np.sqrt(((bottom_r[0] - bottom_l[0]) ** 2) + ((bottom_r[1] - bottom_l[1]) ** 2))
+        width_B = np.sqrt(((top_r[0] - top_l[0]) ** 2) + ((top_r[1] - top_l[1]) ** 2))
+        width = max(int(width_A), int(width_B))
+
+        # Determine height of new image which is the max distance between 
+        # (top right and bottom right) or (top left and bottom left) y-coordinates
+        height_A = np.sqrt(((top_r[0] - bottom_r[0]) ** 2) + ((top_r[1] - bottom_r[1]) ** 2))
+        height_B = np.sqrt(((top_l[0] - bottom_l[0]) ** 2) + ((top_l[1] - bottom_l[1]) ** 2))
+        height = max(int(height_A), int(height_B))
+
+        # Construct new points to obtain top-down view of image in 
+        # top_r, top_l, bottom_l, bottom_r order
+        dimensions = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], 
+                        [0, height - 1]], dtype = "float32")
+
+        # Convert to Numpy format
+        ordered_corners = np.array(ordered_corners, dtype="float32")
+
+
+
+        # Find perspective transform matrix
+        matrix = cv2.getPerspectiveTransform(ordered_corners, dimensions)
+
+        # Return the transformed image
+        return cv2.warpPerspective(image, matrix, (width, height)), matrix
+
+    
+    original = image.copy()
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blur = cv2.medianBlur(gray, 3)
+    thresh = cv2.adaptiveThreshold(blur,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV,11,3)
+
+    cnts = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+    cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
+
+    for c in cnts:
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.015 * peri, True)
+        res = perspective_transform(original, approx)
+        if res is None:
+            return None
+        transformed, M = res
+        break
+
+    return transformed, M
+
+
+
 if __name__ == '__main__':
-    # img_name="./img/sudoko1.png"
-    # img = cv2.imread(img_name)
     cap = cv2.VideoCapture(0)
     digit_recognizer = load_model()
     while True:
@@ -543,10 +543,6 @@ if __name__ == '__main__':
         else:
             cv2.imshow("Camera", img)
             cv2.waitKey(1)
-
-    
-    # 
-
 
     # generate_training_data()
 

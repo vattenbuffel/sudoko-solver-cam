@@ -10,9 +10,9 @@ Display sudoko
 
 
 todo:
-    1) Figure out why it sometimes crashes
-    2) Clean code
-    3) Fix crazy error output code
+    1) Clean code
+    2) Fix crazy error output code
+    3) Start new thread/process which runs the cam
     4) Make app?
 	
 
