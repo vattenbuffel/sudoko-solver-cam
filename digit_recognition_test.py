@@ -14,7 +14,7 @@ if __name__ == '__main__':
         img_path = np.random.choice(os.listdir(path))
         path = path + img_path
 
-        img = cv2.imread(path)#[10:-10,10:-10]
+        img = cv2.imread(path)
         cv2.imshow("number", img)
         pred = digit_recognizer.predict_on_image(img)
         print(pred)

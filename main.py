@@ -283,59 +283,6 @@ def show_all_cells(cells, img, waitKey=0):
         if key == 113: #s
             return
 
-def show_all_cells_and_store(cells, img, max_vals):
-    cv2.namedWindow("cells")
-    for p in cells.values():
-        p0 = np.array([p[0], p[1]], dtype='int')
-        p1 = np.array([p[2], p[3]], dtype='int')
-        cell = img[p0[1]:p1[1], p0[0]:p1[0]]
-        cv2.imshow("cells", cell)
-        key = cv2.waitKey(0)
-        if key > 48 and key < 58:
-            val = key-48
-            max_vals[val] += 1
-            name = "./img/numbers/" + str(val) + "/" + str(val) + "-" + str(max_vals[val]) + ".png"
-            cv2.imwrite(name, cell)
-        
-        if key == 98: #b:
-            max_vals[0] += 1
-            name = "./img/numbers/" + "blank" + "/" + "blank" + "-" + str(max_vals[0]) + ".png"
-            cv2.imwrite(name, cell)
-
-        if key == 113: #q
-            exit()
-
-def max_val_in_file_name(names, prefix):
-    max_val = 0
-    len_prefix = len(prefix)
-    for name in names:
-        n = int(name[len_prefix:-4])
-        if n > max_val: max_val = n
-    return max_val
-
-def generate_training_data():
-    import os
-    import traceback
-    max_n = {}
-    for i in range(1,10):
-        names = os.listdir("./img/numbers/" + str(i))
-        max_n[i] = max_val_in_file_name(names, str(i)+'-')
-
-    max_n[0] = max_val_in_file_name(os.listdir("./img/numbers/blank"), "blank-") # 0=blank
-    
-    sudokos_to_do = os.listdir("./img/sudoko/todo")
-    for sudokok in sudokos_to_do:
-        name = "./img/sudoko/todo/" +  sudokok
-        img = cv2.imread(name)
-        cells, img = extract_numbers_and_cells(img)
-        try:
-            show_all_cells_and_store(cells, img, max_n)
-        except:
-            traceback.print_exc()
-            print("Something went wrong with this image.\nMoving on to the next.")
-
-        os.replace(name, "./img/sudoko/done/" +  sudokok)
-
 def build_board(cells, img, digit_recognizer, show=True, crop_val_factor=0.15, blank_threshold=0.99):
     board = np.zeros((9,9), dtype='int')
     for cell in cells:
@@ -544,5 +491,5 @@ if __name__ == '__main__':
             cv2.imshow("Camera", img)
             cv2.waitKey(1)
 
-    # generate_training_data()
+    # 
 
