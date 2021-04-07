@@ -10,9 +10,9 @@ Display sudoko
 
 
 todo:
-    1) Clean code
-    2) Fix crazy error output code
-    3) Start new thread/process which runs the cam
+    1) Fix crazy error output code, Very hard to do it seems like
+    2) Start new thread/process which runs the cam
+    3) Improve readme
     4) Make app?
 	
 

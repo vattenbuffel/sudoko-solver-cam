@@ -1,8 +1,11 @@
+from queue import Empty, Full
+import queue
 import cv2
 import numpy as np
 from line_math import extend_lines, construct_line, intersection_lines
 from solver import solve
 from network import load_model
+import multiprocessing
 
 def create_board(width, height, board, show=False):
     # Create a base sudoko board
@@ -323,7 +326,11 @@ def build_board(cells, img, digit_recognizer, show=True, crop_val_factor=0.15, b
 
 def extract_numbers_and_cells(img):
     img_sudoko_color = img
-    img_sudoko_color, M = extract_board(img)    
+    res = extract_board(img)  
+    if res is None:
+        return None
+    img_sudoko_color, M = res 
+        
     img_sudoko = cv2.cvtColor(img_sudoko_color, cv2.COLOR_BGR2GRAY)
 
     img_edges = get_edges(img_sudoko)
@@ -465,12 +472,36 @@ def extract_board(image):
     return transformed, M
 
 
-
-if __name__ == '__main__':
+def read_cam(q:multiprocessing.Queue, show:multiprocessing.Lock):
     cap = cv2.VideoCapture(0)
-    digit_recognizer = load_model()
     while True:
         ret, img = cap.read()
+        if ret:
+            try:
+                q.get_nowait()
+            except Empty:
+                pass
+            q.put(img)
+            
+            locked = lock.acquire(False)
+            cv2.imshow("Camera", img)
+            cv2.waitKey(1)
+            if locked:
+                show.release()
+
+
+
+if __name__ == '__main__':
+    q = multiprocessing.Queue(maxsize=1)
+    lock = multiprocessing.Lock()
+
+    cam_reader = multiprocessing.Process(target=read_cam, args=(q, lock))
+    cam_reader.start()    
+
+    digit_recognizer = load_model()
+    while True:
+        img = q.get()
+        
         res = extract_numbers_and_cells(img)
         if res is not None:
             cells, img_warped, img_lines = res
@@ -479,17 +510,17 @@ if __name__ == '__main__':
                 solution = solve(board)
                 solved_board = create_board(640, 480, solution)
                 combined = combine_images([img, solved_board])
+                lock.acquire()
                 cv2.destroyAllWindows()
                 cv2.imshow("Solution", combined)
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
+                lock.release()
                 
             except:
                 print("Invalid board")
             
-        else:
-            cv2.imshow("Camera", img)
-            cv2.waitKey(1)
-
-    # 
+            
+    
+    cam_reader.kill()
 
