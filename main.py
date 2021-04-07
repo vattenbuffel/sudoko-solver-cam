@@ -64,7 +64,10 @@ def get_edges(img):
     return img_edges
 
 def get_lines(img):
-    linesP = cv2.HoughLinesP(img, 1, np.pi / 180, 50, None, 50, 10).reshape(-1,4)
+    linesP = cv2.HoughLinesP(img, 1, np.pi / 180, 50, None, 50, 10)
+    if linesP is None:
+        return None
+    linesP = linesP.reshape(-1,4)
     return linesP
         
 def draw_lines(img, lines):
@@ -174,7 +177,10 @@ def eliminate_duplicated_line_after_warp(lines, epsilon_angle =  10*np.pi/180, d
 
         if np.abs(np.pi/2 - np.abs(angle_of_lines[line])) < epsilon_angle:
             vertical_lines[line[0]] = line
-
+    
+    # If there aren't enough lines:
+    if len(list(horizontal_lines.keys())) < 10 or len(list(vertical_lines.keys())) < 10:
+        return None
     # Remove duplicated vertical lines
     intersections = {}
     h_line0 = horizontal_lines[list(horizontal_lines.keys())[0]]
@@ -377,7 +383,7 @@ def generate_training_data():
 
         os.replace(name, "./img/sudoko/done/" +  sudokok)
 
-def build_board(cells, img, digit_recognizer, pixel_threshold_value=70, show=True, crop_val_factor=0.15, blank_threshold=0.99):
+def build_board(cells, img, digit_recognizer, show=True, crop_val_factor=0.15, blank_threshold=0.99):
     board = np.zeros((9,9), dtype='int')
     for cell in cells:
         p = cells[cell]
@@ -386,6 +392,10 @@ def build_board(cells, img, digit_recognizer, pixel_threshold_value=70, show=Tru
         img_digit = img[p0[1]:p1[1], p0[0]:p1[0]]
         y_crop, x_crop = int(img_digit.shape[0]*crop_val_factor), int(img_digit.shape[1]*crop_val_factor)
         img_digit = img_digit[y_crop:-y_crop,x_crop:-x_crop]
+
+        # Check if empty cell
+        if np.prod(img_digit.shape) == 0:
+            return None
 
         # Change black to black and white to white
         img_digit = cv2.adaptiveThreshold(cv2.cvtColor(img_digit, cv2.COLOR_BGR2GRAY),255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV,11,3)
@@ -414,60 +424,85 @@ def build_board(cells, img, digit_recognizer, pixel_threshold_value=70, show=Tru
 def extract_numbers_and_cells(img):
     img_sudoko_color = img
     img_sudoko_color, M = extract_board(img)    
-    width_max, height_max = 1280, 720
-
     img_sudoko = cv2.cvtColor(img_sudoko_color, cv2.COLOR_BGR2GRAY)
 
     img_edges = get_edges(img_sudoko)
 
     lines = get_lines(img_edges)
+    if lines is None or len(lines) < 50:
+        return None
     img_lines = draw_lines(np.copy(img_edges), lines)
 
-    img = combine_images([img_sudoko_color, img_edges, img_lines])
-    cv2.imshow("board", img)
-    cv2.waitKey(0)
+    # img = combine_images([img_sudoko_color, img_edges, img_lines])
+    # cv2.imshow("board", img)
+    # cv2.waitKey(0)
 
     # Clean some lines
     lines = [construct_line(line[:2], line[2:]) for line in lines]
-    # lines = extend_lines(lines, x_max=img_sudoko_color.shape[1], y_max=img_sudoko_color.shape[0], img = img_edges)
     lines = extend_lines(lines, x_max=img_sudoko_color.shape[1], y_max=img_sudoko_color.shape[0])
     lines = np.ceil(lines).astype('int')
     assert np.all(np.diff(np.array(lines)[:,(0,2)],axis=1) >= 0), f"P1 should be to the right of P0."
-    cv2.imshow("extended lines", draw_lines(np.copy(img_edges), lines))
-    cv2.waitKey(0)
+    # cv2.imshow("extended lines", draw_lines(np.copy(img_edges), lines))
+    # cv2.waitKey(0)
     lines = eliminate_unrelated_lines(lines)
-    cv2.imshow("removed unrelated lines", draw_lines(np.copy(img_edges), lines))
-    cv2.waitKey(0)
+    # cv2.imshow("removed unrelated lines", draw_lines(np.copy(img_edges), lines))
+    # cv2.waitKey(0)
     lines = eliminate_duplicate_lines(lines)
-    cv2.imshow("removed duplicated lines before warp", draw_lines(np.copy(img_edges), lines))
-    cv2.waitKey(0)
-    
-    h_lines, v_lines = eliminate_duplicated_line_after_warp(lines)
-    img_sudoko_lines = draw_lines(img_sudoko, h_lines)
-    img_sudoko_lines = draw_lines(img_sudoko_lines, v_lines)
-    cv2.imshow("removed duplicated lines after warp", img_sudoko_lines)
-    cv2.waitKey(0)
+    # cv2.imshow("removed duplicated lines before warp", draw_lines(np.copy(img_edges), lines))
+    # cv2.waitKey(0)
+    if len(lines) == 0:
+        return None
 
-    img = combine_images([img_lines, img_sudoko_lines])
-    cv2.imshow("board", img)
-    cv2.waitKey(0)
+    res = eliminate_duplicated_line_after_warp(lines)
+    if res is None:
+        return None
+    h_lines, v_lines = res
+
+    # img_sudoko_lines = draw_lines(img_sudoko, h_lines)
+    # img_sudoko_lines = draw_lines(img_sudoko_lines, v_lines)
+    # cv2.imshow("removed duplicated lines after warp", img_sudoko_lines)
+    # cv2.waitKey(0)
+
+    # img = combine_images([img_lines, img_sudoko_lines])
+    # cv2.imshow("board", img)
+    # cv2.waitKey(0)
 
     cells = extract_cells(v_lines, h_lines)
-    cv2.destroyAllWindows()
+    good_cells = set()
+    for i in range(9):
+        for j in range(9):
+            good_cells.add((i,j))
+    for cell in cells:
+        if not cell in good_cells:
+            return None
+    # cv2.destroyAllWindows()
     return cells, img_sudoko_color
 
 if __name__ == '__main__':
-    img_name="./img/sudoko1.png"
-    img = cv2.imread(img_name)
-    cells, img_warped = extract_numbers_and_cells(img)
+    # img_name="./img/sudoko1.png"
+    # img = cv2.imread(img_name)
+    cap = cv2.VideoCapture(0)
+    digit_recognizer = load_model()
+    while True:
+        ret, img = cap.read()
+        res = extract_numbers_and_cells(img)
+        if res is not None:
+            cells, img_warped = res
+            board = build_board(cells, img_warped, digit_recognizer, show=False)
+            try:
+                solve(board)
+            except:
+                print("Invalid board")
+            combined = combine_images([img, img_warped])
+        else:
+            # combined = combine_images([img, np.zeros((480,640,3))])
+            combined = combine_images([img, img])
+        cv2.imshow("input, extracted", combined)
+        cv2.waitKey(1)
 
     
-    digit_recognizer = load_model()
-    board = build_board(cells, img_warped, digit_recognizer, show=False)
-    try:
-        solve(board)
-    except:
-        print("Invalid board")
+    # 
+
 
     # generate_training_data()
 

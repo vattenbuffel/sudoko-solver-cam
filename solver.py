@@ -485,7 +485,7 @@ def solve(board):
     assert board.shape == (9,9), f"The shape of the board must be (9,9). It is {board.shape}."
     # print("Generated board")
     board = cell_board(board)
-    board_print(board)
+    # board_print(board)
 
     # Tries to solve the board using logic. Can't handle any kind of xwing shenanigans
     def try_to_solve(board):
@@ -529,8 +529,8 @@ def solve(board):
                 done = True
 
 
-    print("Press enter to start solving")
-    input()
+    # print("Press enter to start solving")
+    # input()
     start_time = time.time()
     try_to_solve(board)
 

@@ -10,12 +10,16 @@ def extract_board(image):
             #       1 - top-left
             #       2 - bottom-left
             #       3 - bottom-right
+            if len(corners) < 4:
+                return None
             corners = [(corner[0][0], corner[0][1]) for corner in corners]
             top_r, top_l, bottom_l, bottom_r = corners[0], corners[1], corners[2], corners[3]
             return (top_l, top_r, bottom_r, bottom_l)
 
         # Order points in clockwise order
         ordered_corners = order_corner_points(corners)
+        if ordered_corners is None:
+            return None
         top_l, top_r, bottom_r, bottom_l = ordered_corners
 
         # Move the corners outside to increase the square they envelop
@@ -73,7 +77,10 @@ def extract_board(image):
     for c in cnts:
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.015 * peri, True)
-        transformed, M = perspective_transform(original, approx)
+        res = perspective_transform(original, approx)
+        if res is None:
+            return None
+        transformed, M = res
         break
 
     return transformed, M
