@@ -11,7 +11,7 @@ Display sudoko
 
 todo:
     1) Fix crazy error output code, Very hard to do it seems like
-    2) Start new thread/process which runs the cam
+    2) Keep the straightest lines
     3) Improve readme
     4) Make app?
 	

@@ -36,7 +36,7 @@ class Cell():
         new_length = len(self.possible_nums)
 
         if new_length <= 0:
-            raise Exception("No possible value in cell. Invalid sodoku.")
+            raise ValueError("No possible value in cell. Invalid sodoku.")
         return not original_length == new_length
 
     def check_if_only_one_possible_num(self):

@@ -128,7 +128,7 @@ def calc_angle_of_lines(lines):
         angle_of_lines[tuple(line)] = angle
     return angle_of_lines
     
-def eliminate_unrelated_lines(lines, epsilon = 10*np.pi/180, n_neighbours=20):
+def eliminate_unrelated_lines(lines, epsilon = 10*np.pi/180, n_neighbours=10):
     angle_of_lines = calc_angle_of_lines(lines)
     good_lines = []
     
@@ -286,7 +286,7 @@ def show_all_cells(cells, img, waitKey=0):
         if key == 113: #s
             return
 
-def build_board(cells, img, digit_recognizer, show=True, crop_val_factor=0.15, blank_threshold=0.99):
+def build_board(cells, img, digit_recognizer, show=True, crop_val_factor=0.05, blank_threshold=0.99):
     board = np.zeros((9,9), dtype='int')
     for cell in cells:
         p = cells[cell]
@@ -316,7 +316,7 @@ def build_board(cells, img, digit_recognizer, show=True, crop_val_factor=0.15, b
 
         if show:
             print(f"Predicted {val}")
-            cv2.imshow("prediction", img_digit)
+            cv2.imshow("prediction: "+ str(val), img_digit)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
@@ -324,7 +324,7 @@ def build_board(cells, img, digit_recognizer, show=True, crop_val_factor=0.15, b
     
     return board
 
-def extract_numbers_and_cells(img):
+def extract_numbers_and_cells(img, show=False):
     img_sudoko_color = img
     res = extract_board(img)  
     if res is None:
@@ -340,23 +340,28 @@ def extract_numbers_and_cells(img):
         return None
     img_lines = draw_lines(np.copy(img_sudoko_color), lines)
 
-    # img = combine_images([img_sudoko_color, img_edges, img_lines])
-    # cv2.imshow("board", img)
-    # cv2.waitKey(0)
+    if show:
+        img = combine_images([img_sudoko_color, img_edges, img_lines])
+        cv2.imshow("board", img)
+        cv2.waitKey(0)
 
     # Clean some lines
     lines = [construct_line(line[:2], line[2:]) for line in lines]
     lines = extend_lines(lines, x_max=img_sudoko_color.shape[1], y_max=img_sudoko_color.shape[0])
     lines = np.ceil(lines).astype('int')
     assert np.all(np.diff(np.array(lines)[:,(0,2)],axis=1) >= 0), f"P1 should be to the right of P0."
-    # cv2.imshow("extended lines", draw_lines(np.copy(img_edges), lines))
-    # cv2.waitKey(0)
+
+    if show:
+        cv2.imshow("extended lines", draw_lines(np.copy(img_edges), lines))
+        cv2.waitKey(0)
     lines = eliminate_unrelated_lines(lines)
-    # cv2.imshow("removed unrelated lines", draw_lines(np.copy(img_edges), lines))
-    # cv2.waitKey(0)
+    if show:
+        cv2.imshow("removed unrelated lines", draw_lines(np.copy(img_edges), lines))
+        cv2.waitKey(0)
     lines = eliminate_duplicate_lines(lines)
-    # cv2.imshow("removed duplicated lines before warp", draw_lines(np.copy(img_edges), lines))
-    # cv2.waitKey(0)
+    if show:
+        cv2.imshow("removed duplicated lines before warp", draw_lines(np.copy(img_edges), lines))
+        cv2.waitKey(0)
     if len(lines) == 0:
         return None
 
@@ -364,15 +369,11 @@ def extract_numbers_and_cells(img):
     if res is None:
         return None
     h_lines, v_lines = res
+    if show:
+        cv2.imshow("removed duplicated lines after warp", draw_lines(np.copy(img_edges), h_lines+v_lines))
+        cv2.waitKey(0)
 
-    # img_sudoko_lines = draw_lines(img_sudoko, h_lines)
-    # img_sudoko_lines = draw_lines(img_sudoko_lines, v_lines)
-    # cv2.imshow("removed duplicated lines after warp", img_sudoko_lines)
-    # cv2.waitKey(0)
 
-    # img = combine_images([img_lines, img_sudoko_lines])
-    # cv2.imshow("board", img)
-    # cv2.waitKey(0)
 
     cells = extract_cells(v_lines, h_lines)
     good_cells = set()
@@ -383,7 +384,8 @@ def extract_numbers_and_cells(img):
         if not cell in good_cells:
             return None
 
-    # cv2.destroyAllWindows()
+    if show:
+        cv2.destroyAllWindows()
     return cells, img_sudoko_color, img_lines
 
 def extract_board(image):
@@ -472,7 +474,7 @@ def extract_board(image):
     return transformed, M
 
 
-def read_cam(q:multiprocessing.Queue, show:multiprocessing.Lock):
+def read_cam(q:multiprocessing.Queue):
     cap = cv2.VideoCapture(0)
     while True:
         ret, img = cap.read()
@@ -483,41 +485,40 @@ def read_cam(q:multiprocessing.Queue, show:multiprocessing.Lock):
                 pass
             q.put(img)
             
-            locked = lock.acquire(False)
             cv2.imshow("Camera", img)
             cv2.waitKey(1)
-            if locked:
-                show.release()
 
 
 
 if __name__ == '__main__':
     q = multiprocessing.Queue(maxsize=1)
-    lock = multiprocessing.Lock()
 
-    cam_reader = multiprocessing.Process(target=read_cam, args=(q, lock))
+    cam_reader = multiprocessing.Process(target=read_cam, args=(q, ))
     cam_reader.start()    
 
     digit_recognizer = load_model()
     while True:
         img = q.get()
         
-        res = extract_numbers_and_cells(img)
+        res = extract_numbers_and_cells(img, show=False)
         if res is not None:
             cells, img_warped, img_lines = res
             board = build_board(cells, img_warped, digit_recognizer, show=False)
+            if board is None:
+                continue
             try:
                 solution = solve(board)
+                if solution is None:
+                    continue
+
                 solved_board = create_board(640, 480, solution)
                 combined = combine_images([img, solved_board])
-                lock.acquire()
                 cv2.destroyAllWindows()
                 cv2.imshow("Solution", combined)
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
-                lock.release()
                 
-            except:
+            except ValueError:
                 print("Invalid board")
             
             
