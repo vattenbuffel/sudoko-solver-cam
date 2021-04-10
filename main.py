@@ -488,12 +488,8 @@ def read_cam(q:multiprocessing.Queue):
             cv2.imshow("Camera", img)
             cv2.waitKey(1)
 
+def main(cam_reader, q):
 
-
-if __name__ == '__main__':
-    q = multiprocessing.Queue(maxsize=1)
-
-    cam_reader = multiprocessing.Process(target=read_cam, args=(q, ))
     cam_reader.start()    
 
     digit_recognizer = load_model()
@@ -520,8 +516,19 @@ if __name__ == '__main__':
                 
             except ValueError:
                 print("Invalid board")
+    
+    
+
+if __name__ == '__main__':
+    q = multiprocessing.Queue(maxsize=1)
+    cam_reader = multiprocessing.Process(target=read_cam, args=(q, ))
+    try:
+        main(cam_reader, q)
+    except KeyboardInterrupt:
+        cam_reader.kill()
+        cv2.destroyAllWindows()
+        print("Good bye!")
             
             
     
-    cam_reader.kill()
 
