@@ -1,18 +1,8 @@
 import torch
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
-from torch.utils.data import TensorDataset
 from torch.utils.data import DataLoader
 from torch import nn
 from torch import optim
 import torch.nn.functional as F
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix
-from pandas import DataFrame
-import torchvision
 from torchvision.datasets import ImageFolder
 from torchvision import transforms
 from torchvision.transforms import Compose
@@ -209,7 +199,10 @@ class Digit_recognizer(nn.Module):
 
 def load_model(path="network"):
     model = Digit_recognizer(Compose(list_of_transforms))
-    model.load_state_dict(torch.load(path))
+    if torch.cuda.is_available():
+        model.load_state_dict(torch.load(path))
+    else:
+        model.load_state_dict(torch.load(path,map_location=torch.device('cpu')))
     return model
 
 
@@ -220,7 +213,7 @@ list_of_transforms = [transforms.Resize((image_width,image_width)),
                     transforms.ToTensor()]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:", device)
+print("Digit-recogniser uses device:", device)
 
 if __name__ == '__main__':
     train_path = "./img/datasets/combined/training-set/"
