@@ -198,11 +198,13 @@ class Digit_recognizer(nn.Module):
 
 
 def load_model(path="network"):
+    print("Digit-recogniser uses device:", device)
     model = Digit_recognizer(Compose(list_of_transforms))
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(path))
     else:
         model.load_state_dict(torch.load(path,map_location=torch.device('cpu')))
+    print("Loaded model!")
     return model
 
 
@@ -213,9 +215,9 @@ list_of_transforms = [transforms.Resize((image_width,image_width)),
                     transforms.ToTensor()]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Digit-recogniser uses device:", device)
 
 if __name__ == '__main__':
+    print("Digit-recogniser uses device:", device)
     train_path = "./img/datasets/combined/training-set/"
     val_path = "./img/datasets/combined/validation-set/"
 
